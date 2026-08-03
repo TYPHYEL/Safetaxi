@@ -1,0 +1,11 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:safetaxi_cameroun/main.dart';
+
+void main() {
+  testWidgets('SafeTaxi app boots with the main material app', (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: SafeTaxiApp()));
+
+    expect(find.byType(SafeTaxiApp), findsOneWidget);
+  });
+}

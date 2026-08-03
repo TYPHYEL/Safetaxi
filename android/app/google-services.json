@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "376137643989",
+    "firebase_url": "https://safetaxi-b10a8-default-rtdb.firebaseio.com",
+    "project_id": "safetaxi-b10a8",
+    "storage_bucket": "safetaxi-b10a8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:376137643989:android:6617564044cd1237396f5c",
+        "android_client_info": {
+          "package_name": "com.example.safetaxi_cameroun"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJLDLtljASOrYzXEFduppE9F1CCC3qvhE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:376137643989:android:2468d2f371b777b3396f5c",
+        "android_client_info": {
+          "package_name": "com.safetaxi.cameroun"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJLDLtljASOrYzXEFduppE9F1CCC3qvhE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
