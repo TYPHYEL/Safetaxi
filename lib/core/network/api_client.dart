@@ -52,9 +52,12 @@ class ApiClient {
   Future<Response> verifyOtp(Map<String, dynamic> data) =>
       _dio.post('/auth/otp/verify/', data: data);
 
-  Future<Response> verifyOtpWithFiles(Map<String, dynamic> formData) =>
-      _dio.post('/auth/otp/verify/',
-          data: formData, options: Options(contentType: 'multipart/form-data'));
+  Future<Response> verifyOtpWithFiles(dynamic formData) {
+    final data = formData is FormData
+        ? formData
+        : FormData.fromMap(Map<String, dynamic>.from(formData));
+    return _dio.post('/auth/otp/verify/', data: data);
+  }
 
   // ─── Document Validation (OCR) ─────────────────────────────
   Future<Response> validateCni(File cniPhoto) {
@@ -81,12 +84,103 @@ class ApiClient {
         data: formData, options: Options(contentType: 'multipart/form-data'));
   }
 
+  Future<Response> validateRegistration(
+      File registrationPhoto, String plateNumber) {
+    final formData = FormData.fromMap({
+      'registration_photo': MultipartFile.fromFileSync(registrationPhoto.path),
+      'plate_number': plateNumber,
+    });
+    return _dio.post('/document-validation/validate_registration/',
+        data: formData, options: Options(contentType: 'multipart/form-data'));
+  }
+
   Future<Response> compareDocuments(File cniPhoto, File licensePhoto) {
     final formData = FormData.fromMap({
       'cni_photo': MultipartFile.fromFileSync(cniPhoto.path),
       'license_photo': MultipartFile.fromFileSync(licensePhoto.path),
     });
     return _dio.post('/document-validation/compare_documents/',
+        data: formData, options: Options(contentType: 'multipart/form-data'));
+  }
+
+  // ─── Intelligent Document Verification (EasyOCR) ─────────────
+  Future<Response> verifyCniDocument(File cniPhoto, {String? expectedName}) {
+    final formData = FormData.fromMap({
+      'cni_photo': MultipartFile.fromFileSync(cniPhoto.path),
+      if (expectedName != null) 'expected_name': expectedName,
+    });
+    return _dio.post('/verification/verify-cni/',
+        data: formData, options: Options(contentType: 'multipart/form-data'));
+  }
+
+  Future<Response> verifyLicensePlate(File vehiclePhoto, {String? expectedPlate}) {
+    final formData = FormData.fromMap({
+      'vehicle_photo': MultipartFile.fromFileSync(vehiclePhoto.path),
+      if (expectedPlate != null) 'expected_plate': expectedPlate,
+    });
+    return _dio.post('/verification/verify-license-plate/',
+        data: formData, options: Options(contentType: 'multipart/form-data'));
+  }
+
+  Future<Response> verifyVehicleDocument(File vehicleDoc, {String? expectedPlate}) {
+    final formData = FormData.fromMap({
+      'vehicle_doc': MultipartFile.fromFileSync(vehicleDoc.path),
+      if (expectedPlate != null) 'expected_plate': expectedPlate,
+    });
+    return _dio.post('/verification/verify-vehicle-doc/',
+        data: formData, options: Options(contentType: 'multipart/form-data'));
+  }
+
+  Future<Response> checkImageQuality(File image) {
+    final formData = FormData.fromMap({
+      'image': MultipartFile.fromFileSync(image.path),
+    });
+    return _dio.post('/verification/check-quality/',
+        data: formData, options: Options(contentType: 'multipart/form-data'));
+  }
+
+  Future<Response> compareDocumentsVerification(File doc1, File doc2) {
+    final formData = FormData.fromMap({
+      'doc1': MultipartFile.fromFileSync(doc1.path),
+      'doc2': MultipartFile.fromFileSync(doc2.path),
+    });
+    return _dio.post('/verification/compare-documents/',
+        data: formData, options: Options(contentType: 'multipart/form-data'));
+  }
+
+  Future<Response> detectFace(File image) {
+    final formData = FormData.fromMap({
+      'image': MultipartFile.fromFileSync(image.path),
+    });
+    return _dio.post('/verification/detect-face/',
+        data: formData, options: Options(contentType: 'multipart/form-data'));
+  }
+
+  Future<Response> generateFaceEmbedding(File image) {
+    final formData = FormData.fromMap({
+      'image': MultipartFile.fromFileSync(image.path),
+    });
+    return _dio.post('/verification/generate-face-embedding/',
+        data: formData, options: Options(contentType: 'multipart/form-data'));
+  }
+
+  Future<Response> verifyFaceMatch(File image1, File image2, {double threshold = 0.4}) {
+    final formData = FormData.fromMap({
+      'image1': MultipartFile.fromFileSync(image1.path),
+      'image2': MultipartFile.fromFileSync(image2.path),
+      'threshold': threshold,
+    });
+    return _dio.post('/verification/verify-face-match/',
+        data: formData, options: Options(contentType: 'multipart/form-data'));
+  }
+
+  Future<Response> verifyFaceWithEmbedding(File image, List<double> embedding, {double threshold = 0.4}) {
+    final formData = FormData.fromMap({
+      'image': MultipartFile.fromFileSync(image.path),
+      'embedding': embedding,
+      'threshold': threshold,
+    });
+    return _dio.post('/verification/verify-face-embedding/',
         data: formData, options: Options(contentType: 'multipart/form-data'));
   }
 
@@ -98,13 +192,19 @@ class ApiClient {
   Future<Response> updateProfile(Map<String, dynamic> data) =>
       _dio.patch('/auth/profile/', data: data);
 
+  Future<Response> updateProfilePhoto(File photo) {
+    final formData = FormData.fromMap({
+      'photo': MultipartFile.fromFileSync(photo.path),
+    });
+    return _dio.patch('/auth/profile/',
+        data: formData, options: Options(contentType: 'multipart/form-data'));
+  }
+
   // Generic HTTP helpers
-  Future<Response> get(String path,
-          {Map<String, dynamic>? queryParameters}) =>
+  Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) =>
       _dio.get(path, queryParameters: queryParameters);
 
-  Future<Response> post(String path,
-          {dynamic data, Options? options}) =>
+  Future<Response> post(String path, {dynamic data, Options? options}) =>
       _dio.post(path, data: data, options: options);
 
   Future<Response> patch(String path, {dynamic data}) =>
@@ -135,14 +235,22 @@ class ApiClient {
       _dio.get('/taxis/nearby/',
           queryParameters: {'lat': lat, 'lng': lng, 'radius': radius});
 
-  Future<Response> createTaxi(Map<String, dynamic> data) =>
-      _dio.post('/taxis/', data: data);
+  Future<Response> createTaxi(Map<String, dynamic> data, {File? photo}) {
+    if (photo != null) {
+      return postMultipart('/taxis/',
+          data: data, files: {'image': MultipartFile.fromFileSync(photo.path)});
+    }
+    return _dio.post('/taxis/', data: data);
+  }
 
   Future<Response> getTaxiQrCode(String id) => _dio.get('/taxis/$id/qrcode/');
 
   // ─── Trajets ───────────────────────────────────────────
-  Future<Response> startTrip(Map<String, dynamic> data) =>
-      _dio.post('/trips/start/', data: data);
+  Future<Response> createTrip(Map<String, dynamic> data) =>
+      _dio.post('/trips/', data: data);
+
+  Future<Response> startTrip(String tripId, Map<String, dynamic> data) =>
+      _dio.post('/trips/$tripId/start/', data: data);
 
   Future<Response> joinTrip(String tripId, Map<String, dynamic> data) =>
       _dio.post('/trips/$tripId/join/', data: data);
@@ -159,6 +267,33 @@ class ApiClient {
       _dio.get('/trips/history/', queryParameters: {'page': page});
 
   Future<Response> getActiveTrip() => _dio.get('/trips/active/');
+
+  // ─── Dépôts (Courses privées) ─────────────────────────────
+  Future<Response> calculateDepositFare(Map<String, dynamic> data) =>
+      _dio.post('/deposits/calculate_fare/', data: data);
+
+  Future<Response> createDeposit(Map<String, dynamic> data) =>
+      _dio.post('/deposits/create_deposit/', data: data);
+
+  Future<Response> acceptDeposit(String depositId) =>
+      _dio.post('/deposits/$depositId/accept/');
+
+  Future<Response> rejectDeposit(String depositId) =>
+      _dio.post('/deposits/$depositId/reject/');
+
+  Future<Response> startDeposit(String depositId) =>
+      _dio.post('/deposits/$depositId/start/');
+
+  Future<Response> completeDeposit(String depositId) =>
+      _dio.post('/deposits/$depositId/complete/');
+
+  Future<Response> cancelDeposit(String depositId) =>
+      _dio.post('/deposits/$depositId/cancel/');
+
+  Future<Response> getDeposit(String depositId) =>
+      _dio.get('/deposits/$depositId/');
+
+  Future<Response> getMyDeposits() => _dio.get('/deposits/');
 
   // ─── SOS ───────────────────────────────────────────────
   Future<Response> sendSos(Map<String, dynamic> data) =>
@@ -182,7 +317,12 @@ class ApiClient {
 
   Future<Response> uploadDriverDoc(String docType, dynamic formData) =>
       _dio.post('/driver-docs/',
-          data: formData, options: Options(contentType: 'multipart/form-data'));
+          data: formData,
+          options: Options(
+            contentType: 'multipart/form-data',
+            sendTimeout: const Duration(seconds: AppConstants.uploadTimeout),
+            receiveTimeout: const Duration(seconds: AppConstants.uploadTimeout),
+          ));
 
   Future<Response> activateShift(String driverId) =>
       _dio.post('/drivers/$driverId/activate/');

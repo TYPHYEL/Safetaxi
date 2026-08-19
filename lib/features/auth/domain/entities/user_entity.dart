@@ -16,6 +16,7 @@ class UserEntity extends Equatable {
   final bool isVerified;
   final bool isActive;
   final DateTime createdAt;
+  final Map<String, dynamic>? driverProfile;
 
   const UserEntity({
     required this.id,
@@ -28,16 +29,18 @@ class UserEntity extends Equatable {
     this.isVerified = false,
     this.isActive = true,
     required this.createdAt,
+    this.driverProfile,
   });
 
   String get fullName => '$firstName $lastName';
-  String get displayName => '$firstName ${lastName[0]}.';
+  String get displayName =>
+      lastName.isNotEmpty ? '$firstName ${lastName[0]}.' : firstName;
   String get initials =>
       '${firstName.isNotEmpty ? firstName[0] : ''}${lastName.isNotEmpty ? lastName[0] : ''}';
 
   @override
   List<Object?> get props =>
-      [id, phone, firstName, lastName, role, trustScore, isVerified];
+      [id, phone, firstName, lastName, role, trustScore, isVerified, driverProfile];
 }
 
 class PassengerEntity extends Equatable {

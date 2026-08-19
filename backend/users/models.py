@@ -35,11 +35,16 @@ class DriverProfile(models.Model):
     license_photo = models.ImageField(upload_to='driver_licenses/', blank=True, null=True)
     vehicle_photo = models.ImageField(upload_to='driver_vehicles/', blank=True, null=True)
     cni_photo = models.ImageField(upload_to='driver_cni/', blank=True, null=True)
+    profile_photo = models.ImageField(upload_to='driver_profiles/', blank=True, null=True)
     birth_date = models.DateField(blank=True, null=True)
     verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
     # path to uploaded documents stored via storage backends
     documents = models.JSONField(default=dict, blank=True)
+    # Unique QR code for the driver
+    qr_code = models.CharField(max_length=64, unique=True, blank=True, null=True)
+    # Face embedding for biometric verification
+    face_embedding = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return f"DriverProfile {self.user.username}"

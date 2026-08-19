@@ -14,6 +14,7 @@ class UserModel extends UserEntity {
     super.isVerified,
     super.isActive,
     required super.createdAt,
+    super.driverProfile,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +30,7 @@ class UserModel extends UserEntity {
       isVerified: json['is_verified'] as bool? ?? false,
       isActive: json['is_active'] as bool? ?? true,
       createdAt: DateTime.parse(json['created_at'] as String),
+      driverProfile: json['driver_profile'] as Map<String, dynamic>?,
     );
   }
 
@@ -43,6 +45,7 @@ class UserModel extends UserEntity {
         'is_verified': isVerified,
         'is_active': isActive,
         'created_at': createdAt.toIso8601String(),
+        'driver_profile': driverProfile,
       };
 
   static UserRole _roleFromString(String s) {
@@ -87,6 +90,7 @@ class RegisterRequest {
   final File? licensePhoto;
   final File? vehiclePhoto;
   final File? cniPhoto;
+  final File? profilePhoto;
   final String? birthDate;
   final String? gender;
 
@@ -100,6 +104,7 @@ class RegisterRequest {
     this.licensePhoto,
     this.vehiclePhoto,
     this.cniPhoto,
+    this.profilePhoto,
     this.birthDate,
     this.gender,
   });

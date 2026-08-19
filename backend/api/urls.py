@@ -11,7 +11,7 @@ from .views import (
 )
 from users.views import FirebaseLoginView
 from taxis.views import TaxiViewSet
-from trips.views import TripViewSet
+from trips.views import TripViewSet, DepositViewSet
 from sos.views import IncidentViewSet
 from documents.views import DriverDocumentViewSet
 from ratings.views import RatingViewSet
@@ -20,6 +20,7 @@ from notifications.views import DeviceViewSet
 from rotations.views import DriverRotationViewSet
 from ai.views import AIViewSet
 from ocr.views import DocumentValidationViewSet
+from verification.urls import urlpatterns as verification_urls
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 router = DefaultRouter()
@@ -27,6 +28,7 @@ router.register(r'users', UserViewSet)
 router.register(r'drivers', DriverProfileViewSet)
 router.register(r'taxis', TaxiViewSet)
 router.register(r'trips', TripViewSet)
+router.register(r'deposits', DepositViewSet)
 router.register(r'incidents', IncidentViewSet)
 router.register(r'driver-docs', DriverDocumentViewSet)
 router.register(r'ratings', RatingViewSet)
@@ -47,6 +49,8 @@ urlpatterns = [
     path('auth/otp/send/', SendOtpView.as_view(), name='auth-otp-send'),
     path('auth/otp/verify/', VerifyOtpView.as_view(), name='auth-otp-verify'),
     path('auth/profile/', ProfileView.as_view(), name='auth-profile'),
+    # Verification endpoints
+    path('verification/', include((verification_urls, 'verification'), namespace='verification')),
     # Alias pour compatibilité frontend
     path('sos/alert/', IncidentViewSet.as_view({'post': 'create'}), name='sos-alert'),
     # Trip start endpoint for frontend compatibility

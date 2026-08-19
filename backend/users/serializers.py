@@ -14,12 +14,15 @@ class DriverProfileSerializer(serializers.ModelSerializer):
             'license_photo',
             'vehicle_photo',
             'cni_photo',
+            'profile_photo',
             'birth_date',
             'verified',
             'is_active',
             'documents',
+            'qr_code',
+            'face_embedding',
         ]
-        read_only_fields = ['id', 'verified']
+        read_only_fields = ['id', 'verified', 'qr_code', 'face_embedding']
 
 
 class UserSerializer(serializers.ModelSerializer):

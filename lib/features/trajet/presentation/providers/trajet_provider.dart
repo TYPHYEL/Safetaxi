@@ -268,7 +268,7 @@ class ActiveTripNotifier extends StateNotifier<ActiveTripState> {
     state = state.copyWith(isLoading: true);
     try {
       final pos = await _gps.getCurrentPosition();
-      final resp = await _api.startTrip({
+      final resp = await _api.createTrip({
         'driver_taxi_id': driverTaxiId,
         if (pos != null) 'start_lat': pos.latitude,
         if (pos != null) 'start_lng': pos.longitude,

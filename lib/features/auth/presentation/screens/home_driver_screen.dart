@@ -1,8 +1,13 @@
 // lib/features/auth/presentation/screens/home_driver_screen.dart
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:safetaxi_cameroun/core/constants/app_constants.dart';
+import 'package:safetaxi_cameroun/core/network/api_client.dart';
 import 'package:safetaxi_cameroun/features/auth/presentation/providers/auth_provider.dart';
 import 'package:safetaxi_cameroun/features/trajet/presentation/providers/trajet_provider.dart';
 import 'package:safetaxi_cameroun/shared/theme/app_theme.dart';
@@ -18,6 +23,9 @@ class _HomeDriverScreenState extends ConsumerState<HomeDriverScreen>
     with TickerProviderStateMixin {
   bool _isOnline = false;
   String? _selectedTaxiId;
+  bool _isVerifying = false;
+  dynamic _currentFacePhoto;
+  Map<String, dynamic>? _verificationResult;
   late final AnimationController _pulseCtrl;
   late final Animation<double> _pulseAnim;
   int _navIndex = 0;
@@ -76,6 +84,10 @@ class _HomeDriverScreenState extends ConsumerState<HomeDriverScreen>
 
                     // Trust Score
                     _buildTrustCard(user?.trustScore ?? 5.0),
+                    const SizedBox(height: 20),
+
+                    // QR Code
+                    _buildQRCodeCard(user),
                     const SizedBox(height: 20),
 
                     // Actions
@@ -160,6 +172,88 @@ class _HomeDriverScreenState extends ConsumerState<HomeDriverScreen>
     );
   }
 
+  Future<void> _handleServiceToggle(bool value) async {
+    if (value) {
+      // Starting service - require biometric verification
+      await _performBiometricVerification();
+    } else {
+      // Stopping service - no verification needed
+      setState(() => _isOnline = false);
+    }
+  }
+
+  Future<void> _performBiometricVerification() async {
+    final user = ref.read(currentUserProvider);
+    final faceEmbedding = user?.driverProfile?['face_embedding'] as List<dynamic>?;
+    
+    if (faceEmbedding == null || faceEmbedding.isEmpty) {
+      // No face embedding stored, allow service without verification
+      setState(() => _isOnline = true);
+      return;
+    }
+    
+    // Show biometric verification dialog
+    setState(() => _isVerifying = true);
+    
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
+      imageQuality: 90,
+      preferredCameraDevice: CameraDevice.front,
+    );
+    
+    if (pickedFile == null) {
+      setState(() => _isVerifying = false);
+      return;
+    }
+    
+    setState(() => _currentFacePhoto = pickedFile);
+    
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final embeddingList = faceEmbedding.map((e) => (e as num).toDouble()).toList();
+      
+      final response = await apiClient.verifyFaceWithEmbedding(
+        _currentFacePhoto,
+        embeddingList,
+        threshold: 0.4,
+      );
+      
+      setState(() => _verificationResult = response.data as Map<String, dynamic>);
+      
+      final verified = _verificationResult?['verified'] as bool? ?? false;
+      
+      if (verified) {
+        setState(() => _isOnline = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vérification biométrique réussie - Service activé'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        setState(() => _isOnline = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Vérification biométrique échouée - Visage non reconnu'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isOnline = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur de vérification: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isVerifying = false);
+      setState(() => _currentFacePhoto = null);
+    }
+  }
+
   Widget _buildServiceToggle() {
     return GestureDetector(
       onTap: () => setState(() => _isOnline = !_isOnline),
@@ -170,82 +264,81 @@ class _HomeDriverScreenState extends ConsumerState<HomeDriverScreen>
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: _isOnline
-                  ? LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.primary.withValues(alpha: 0.15),
-                        AppColors.primarySurface,
-                      ],
-                    )
-                  : null,
-              color: _isOnline ? null : AppColors.card,
-              borderRadius: BorderRadius.circular(16),
+              color: AppColors.surfaceElevated,
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: _isOnline
-                    ? AppColors.primary.withValues(alpha: 0.4)
-                    : AppColors.border,
-                width: _isOnline ? 1.5 : 0.5,
+                color: _isOnline ? AppColors.primary : Colors.transparent,
+                width: 2,
               ),
               boxShadow: _isOnline
                   ? [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.2),
+                        color: AppColors.primary.withValues(alpha: 0.3),
                         blurRadius: 20,
                         spreadRadius: 2,
                       ),
                     ]
                   : null,
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: _isOnline
-                        ? AppColors.primary.withValues(alpha: 0.2)
-                        : AppColors.surfaceElevated,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _isOnline
-                        ? Icons.radio_button_checked_rounded
-                        : Icons.radio_button_unchecked_rounded,
-                    color: _isOnline ? AppColors.primary : AppColors.textMuted,
-                    size: 30,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            child: _isVerifying
+                ? Column(
                     children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 12),
                       Text(
-                        _isOnline ? 'En service' : 'Hors service',
-                        style: AppTextStyles.titleLarge.copyWith(
-                          color: _isOnline
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                      Text(
-                        _isOnline
-                            ? 'Votre taxi est visible et traçable'
-                            : 'Appuyez pour démarrer votre service',
+                        'Vérification biométrique...',
                         style: AppTextStyles.bodySmall,
                       ),
                     ],
+                  )
+                : Row(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: _isOnline
+                              ? AppColors.primary.withValues(alpha: 0.2)
+                              : AppColors.surfaceElevated,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _isOnline
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                          color: _isOnline ? AppColors.primary : AppColors.textMuted,
+                          size: 30,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _isOnline ? 'En service' : 'Hors service',
+                              style: AppTextStyles.titleLarge.copyWith(
+                                color: _isOnline
+                                    ? AppColors.primary
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                            Text(
+                              _isOnline
+                                  ? 'Votre taxi est visible et traçable'
+                                  : 'Appuyez pour démarrer votre service',
+                              style: AppTextStyles.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _isOnline,
+                        onChanged: _handleServiceToggle,
+                        activeColor: AppColors.primary,
+                      ),
+                    ],
                   ),
-                ),
-                Switch(
-                  value: _isOnline,
-                  onChanged: (v) => setState(() => _isOnline = v),
-                  activeColor: AppColors.primary,
-                ),
-              ],
-            ),
           ),
         ),
       ),
@@ -427,6 +520,62 @@ class _HomeDriverScreenState extends ConsumerState<HomeDriverScreen>
                 color: AppColors.textMuted, size: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildQRCodeCard(user) {
+    final qrCode = user?.driverProfile?['qr_code'] as String?;
+    if (qrCode == null || qrCode.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.qr_code_2_rounded, color: AppColors.primary, size: 24),
+              const SizedBox(width: 8),
+              Text('Votre Code QR', style: AppTextStyles.titleLarge),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: QrImageView(
+              data: qrCode,
+              version: QrVersions.auto,
+              size: 200.0,
+              backgroundColor: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Partagez ce code avec vos passagers',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textMuted,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            qrCode,
+            style: AppTextStyles.labelMedium.copyWith(
+              color: AppColors.textSecondary,
+              letterSpacing: 2,
+            ),
+          ),
+        ],
       ),
     );
   }

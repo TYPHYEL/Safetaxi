@@ -137,6 +137,62 @@ class DocumentValidationViewSet(viewsets.ViewSet):
             # Clean up temporary file
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
+
+    @action(detail=False, methods=['post'])
+    def validate_registration(self, request):
+        """Validate vehicle registration (carte grise) and compare plate number."""
+        registration_photo = request.FILES.get('registration_photo')
+        expected_plate = request.data.get('plate_number')
+
+        if not registration_photo:
+            return Response(
+                {'detail': 'Registration photo is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not expected_plate:
+            return Response(
+                {'detail': 'Plate number is required for validation'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+            for chunk in registration_photo.chunks():
+                temp_file.write(chunk)
+            temp_path = temp_file.name
+
+        try:
+            text = self.ocr_service.extract_text_from_image(temp_path)
+            if not text:
+                return Response(
+                    {'detail': 'Unable to extract text from registration photo'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            plate, confidence = self.ocr_service.detect_license_plate(text)
+            matched = False
+            if plate:
+                actual_plate = plate.replace(' ', '').upper()
+                expected = expected_plate.replace(' ', '').upper()
+                matched = actual_plate == expected
+
+            return Response({
+                'success': True,
+                'extracted_text': text,
+                'registration_plate': plate,
+                'confidence': confidence,
+                'expected_plate': expected_plate,
+                'plate_match': matched,
+              'message': 'Plaque correspondante' if matched else 'Plaque ne correspond pas à la carte grise',
+            })
+        except Exception as e:
+            return Response(
+                {'detail': f'Error processing registration: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
     
     @action(detail=False, methods=['post'])
     def compare_documents(self, request):

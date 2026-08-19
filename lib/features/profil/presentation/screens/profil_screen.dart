@@ -1,18 +1,29 @@
 // lib/features/profil/presentation/screens/profil_screen.dart
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:safetaxi_cameroun/core/constants/app_constants.dart';
 import 'package:safetaxi_cameroun/features/auth/domain/entities/user_entity.dart';
 import 'package:safetaxi_cameroun/features/auth/presentation/providers/auth_provider.dart';
 import 'package:safetaxi_cameroun/shared/theme/app_theme.dart';
 import 'package:safetaxi_cameroun/shared/widgets/safe_avatar.dart';
 
-class ProfilScreen extends ConsumerWidget {
+class ProfilScreen extends ConsumerStatefulWidget {
   const ProfilScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfilScreen> createState() => _ProfilScreenState();
+}
+
+class _ProfilScreenState extends ConsumerState<ProfilScreen> {
+  bool _isUploadingPhoto = false;
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
 
     return Scaffold(
@@ -63,17 +74,7 @@ class ProfilScreen extends ConsumerWidget {
                   _MenuItem(
                     icon: Icons.contacts_rounded,
                     label: 'Contacts d\'urgence',
-                    onTap: () {},
-                  ),
-                  _MenuItem(
-                    icon: Icons.emergency_rounded,
-                    label: 'Tester le SOS',
-                    onTap: () => context.push(AppRoutes.sos),
-                  ),
-                  _MenuItem(
-                    icon: Icons.fingerprint_rounded,
-                    label: 'Biométrie',
-                    onTap: () {},
+                    onTap: () => context.push(AppRoutes.emergencyContacts),
                   ),
                 ]),
 
@@ -90,9 +91,9 @@ class ProfilScreen extends ConsumerWidget {
                     ),
                     if (user?.role == UserRole.owner)
                       _MenuItem(
-                        icon: Icons.group_rounded,
-                        label: 'Gérer les chauffeurs',
-                        onTap: () => context.push(AppRoutes.manageDrivers),
+                        icon: Icons.add_rounded,
+                        label: 'Ajouter un taxi',
+                        onTap: () => context.push(AppRoutes.taxiCreate),
                       ),
                   ]),
                 ],
@@ -191,12 +192,32 @@ class ProfilScreen extends ConsumerWidget {
                 initials: user?.initials ?? 'P',
                 size: 80,
                 borderColor: AppColors.primary,
+                onTap: _pickProfilePhoto,
               ),
+              if (_isUploadingPhoto)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.textPrimary.withValues(alpha: 0.35),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               Positioned(
                 bottom: 0,
                 right: -4,
                 child: GestureDetector(
-                  onTap: () {},
+                  onTap: _pickProfilePhoto,
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
@@ -300,6 +321,37 @@ class ProfilScreen extends ConsumerWidget {
         return 'Administrateur';
       default:
         return 'Passager';
+    }
+  }
+
+  Future<void> _pickProfilePhoto() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1000,
+      maxHeight: 1000,
+      imageQuality: 80,
+    );
+    if (image == null) return;
+
+    setState(() => _isUploadingPhoto = true);
+    try {
+      // On web, use XFile directly; on mobile, convert to File
+      final file = kIsWeb ? image : File(image.path);
+      await ref.read(authProvider.notifier).updateProfilePhoto(file);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo de profil mise à jour')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur de téléchargement : $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
     }
   }
 

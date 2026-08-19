@@ -1,5 +1,6 @@
 // lib/core/services/biometric_service.dart
-import 'dart:io';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:logger/logger.dart';
@@ -19,14 +20,14 @@ class BiometricService {
   BiometricService(this._apiClient) : _imagePicker = ImagePicker();
 
   /// Capture un selfie depuis la caméra
-  Future<File?> captureSelfie() async {
+  Future<dynamic> captureSelfie() async {
     try {
       final image = await _imagePicker.pickImage(
-        source: ImageSource.camera,
+        source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
         imageQuality: 90,
         preferredCameraDevice: CameraDevice.front,
       );
-      return image != null ? File(image.path) : null;
+      return image; // Return XFile for web, File for mobile
     } catch (e) {
       _log.e('Erreur capture selfie: $e');
       return null;
@@ -36,7 +37,7 @@ class BiometricService {
   /// Vérifie si le selfie correspond à la référence via le backend
   /// 
   /// Utilise l'endpoint backend /api/biometric/verify/ qui utilise AWS Rekognition
-  Future<Map<String, dynamic>> verifyFaceMatch(File selfie, File reference) async {
+  Future<Map<String, dynamic>> verifyFaceMatch(dynamic selfie, dynamic reference) async {
     try {
       _log.i('Vérification faciale via backend AWS Rekognition');
       
@@ -78,7 +79,7 @@ class BiometricService {
 
   /// Analyse basique de la qualité du selfie
   /// NOTE: Sans ML Kit local, cette fonction fait une vérification simple
-  Future<Map<String, dynamic>> analyzeSelfieQuality(File imageFile) async {
+  Future<Map<String, dynamic>> analyzeSelfieQuality(dynamic imageFile) async {
     // Vérification basique - le fichier existe et a une taille raisonnable
     try {
       final bytes = await imageFile.readAsBytes();

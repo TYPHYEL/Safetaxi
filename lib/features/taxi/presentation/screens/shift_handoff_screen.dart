@@ -2,7 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:safetaxi_cameroun/core/services/driver_rotation_service.dart';
 import 'package:safetaxi_cameroun/shared/theme/app_theme.dart';
 import 'package:geolocator/geolocator.dart';
@@ -27,8 +28,8 @@ class _ShiftHandoffScreenState extends ConsumerState<ShiftHandoffScreen> {
   DriverRotationService get _rotationService => ref.read(driverRotationServiceProvider);
   final _imagePicker = ImagePicker();
   
-  File? _outgoingSelfie;
-  File? _incomingSelfie;
+  dynamic _outgoingSelfie;
+  dynamic _incomingSelfie;
   String? _handoffId;
   bool _isVerifying = false;
   bool _isCompleted = false;
@@ -62,23 +63,23 @@ class _ShiftHandoffScreenState extends ConsumerState<ShiftHandoffScreen> {
 
   Future<void> _pickOutgoingSelfie() async {
     final image = await _imagePicker.pickImage(
-      source: ImageSource.camera,
+      source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
       imageQuality: 90,
       preferredCameraDevice: CameraDevice.front,
     );
     if (image != null) {
-      setState(() => _outgoingSelfie = File(image.path));
+      setState(() => _outgoingSelfie = image);
     }
   }
 
   Future<void> _pickIncomingSelfie() async {
     final image = await _imagePicker.pickImage(
-      source: ImageSource.camera,
+      source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
       imageQuality: 90,
       preferredCameraDevice: CameraDevice.front,
     );
     if (image != null) {
-      setState(() => _incomingSelfie = File(image.path));
+      setState(() => _incomingSelfie = image);
     }
   }
 

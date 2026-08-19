@@ -83,12 +83,16 @@ class EmergencyContact {
   final String name;
   final String phone;
   final String relation;
+  final bool canReceiveSms;
+  final bool canReceiveCall;
 
   const EmergencyContact({
     required this.id,
     required this.name,
     required this.phone,
     required this.relation,
+    this.canReceiveSms = true,
+    this.canReceiveCall = true,
   });
 
   factory EmergencyContact.fromJson(Map<String, dynamic> json) =>
@@ -97,6 +101,8 @@ class EmergencyContact {
         name: json['name'] as String,
         phone: json['phone'] as String,
         relation: json['relation'] as String,
+        canReceiveSms: json['can_receive_sms'] as bool? ?? true,
+        canReceiveCall: json['can_receive_call'] as bool? ?? true,
       );
 }
 
@@ -218,18 +224,21 @@ class SosNotifier extends StateNotifier<SosState> {
 
   // ─── Alerter les contacts d'urgence ───────────────────
 
-  Future<void> _alertEmergencyContacts(
-      SosAlertType type, Position? pos) async {
+  Future<void> _alertEmergencyContacts(SosAlertType type, Position? pos) async {
     final contacts = await _loadContacts();
     if (contacts.isEmpty) return;
 
     final message = _buildSosMessage(type, pos);
     _log.d('Would send SMS to ${contacts.length} contacts: $message');
 
-    // TODO: Intégrer un service SMS (Twilio, Africa's Talking, etc.)
-    // Pour l'instant on log seulement
+    // TODO: Intégrer un service SMS / appel réel (Twilio, Africa's Talking, etc.)
     for (final c in contacts) {
-      _log.d('SOS → ${c.name} (${c.phone}): $message');
+      final methods = <String>[];
+      if (c.canReceiveSms) methods.add('SMS');
+      if (c.canReceiveCall) methods.add('Appel');
+      if (methods.isEmpty) continue;
+      _log.d(
+          'SOS → ${c.name} (${c.phone}) via ${methods.join(' / ')} : $message');
     }
   }
 
@@ -296,13 +305,11 @@ final sosProvider = StateNotifierProvider<SosNotifier, SosState>((ref) {
 // ─── Stream des SOS actifs à proximité ───────────────────
 // Utilisé par les chauffeurs pour être alertés des SOS
 
-final nearbySosStreamProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+final nearbySosStreamProvider =
+    StreamProvider<List<Map<String, dynamic>>>((ref) {
   final db = FirebaseDatabase.instance;
 
-  return db
-      .ref('${AppConstants.firebaseSosPath}/active')
-      .onValue
-      .map((event) {
+  return db.ref('${AppConstants.firebaseSosPath}/active').onValue.map((event) {
     final data = event.snapshot.value as Map<dynamic, dynamic>?;
     if (data == null) return [];
 

@@ -13,6 +13,7 @@ class TaxiSerializer(serializers.ModelSerializer):
     owner = UserSerializer(read_only=True)
     active_driver = UserSerializer(read_only=True)
     license_number = serializers.CharField(required=False, allow_blank=True)
+    image = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Taxi
@@ -25,6 +26,7 @@ class TaxiSerializer(serializers.ModelSerializer):
             'model',
             'color',
             'license_number',
+            'image',
             'capacity',
             'is_active',
             'last_lat',

@@ -1,4 +1,7 @@
 import random
+import uuid
+import string
+import logging
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -13,6 +16,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import CustomUser, DriverProfile, PhoneOTP
 from .serializers import UserSerializer, RegisterSerializer, DriverProfileSerializer
+
+logger = logging.getLogger(__name__)
 
 # Firebase Admin SDK initialization
 try:
@@ -37,6 +42,17 @@ try:
             print(f"Firebase credentials not found at: {firebase_creds_path}")
 except Exception as e:
     print(f"Firebase initialization error: {e}")
+
+
+def generate_unique_qr_code():
+    """Generate a unique QR code for a driver"""
+    # Generate a unique 16-character alphanumeric code
+    chars = string.ascii_uppercase + string.digits
+    while True:
+        qr_code = ''.join(random.choices(chars, k=16))
+        # Check if this QR code already exists
+        if not DriverProfile.objects.filter(qr_code=qr_code).exists():
+            return qr_code
 
 
 class RegisterView(viewsets.GenericViewSet):
@@ -152,7 +168,11 @@ class VerifyOtpView(APIView):
 
         # Handle driver registration with photos
         if user.role == 'driver':
-            driver_profile, _ = DriverProfile.objects.get_or_create(user=user)
+            driver_profile, created = DriverProfile.objects.get_or_create(user=user)
+            
+            # Generate unique QR code if not already set
+            if not driver_profile.qr_code:
+                driver_profile.qr_code = generate_unique_qr_code()
             
             # Handle license photo upload
             license_photo = request.FILES.get('license_photo')
@@ -169,6 +189,39 @@ class VerifyOtpView(APIView):
             cni_photo = request.FILES.get('cni_photo')
             if cni_photo:
                 driver_profile.cni_photo = cni_photo
+            
+            # Handle profile photo upload
+            profile_photo = request.FILES.get('profile_photo')
+            if profile_photo:
+                driver_profile.profile_photo = profile_photo
+                
+                # Generate face embedding from profile photo
+                try:
+                    from verification.services import get_verification_service
+                    import tempfile
+                    import os
+                    
+                    # Save profile photo temporarily
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+                        for chunk in profile_photo.chunks():
+                            temp_file.write(chunk)
+                        temp_path = temp_file.name
+                    
+                    try:
+                        service = get_verification_service()
+                        embedding_result = service.generate_face_embedding(temp_path)
+                        
+                        if embedding_result.get('valid') and embedding_result.get('embedding'):
+                            driver_profile.face_embedding = embedding_result['embedding']
+                            logger.info(f"Face embedding generated for driver {user.username}")
+                        else:
+                            logger.warning(f"Failed to generate face embedding for driver {user.username}: {embedding_result.get('error')}")
+                    finally:
+                        # Clean up temporary file
+                        if os.path.exists(temp_path):
+                            os.unlink(temp_path)
+                except Exception as e:
+                    logger.error(f"Error generating face embedding: {e}")
             
             # Handle birth date
             if birth_date_str:
@@ -272,7 +325,12 @@ class FirebaseLoginView(APIView):
 
             # Créer le profil chauffeur si nécessaire
             if user.role == 'driver':
-                DriverProfile.objects.get_or_create(user=user)
+                driver_profile, created = DriverProfile.objects.get_or_create(user=user)
+                
+                # Generate unique QR code if not already set
+                if not driver_profile.qr_code:
+                    driver_profile.qr_code = generate_unique_qr_code()
+                    driver_profile.save()
 
             # Générer les tokens JWT
             refresh = RefreshToken.for_user(user)

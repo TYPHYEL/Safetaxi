@@ -171,8 +171,8 @@ class EmergencyContactsScreen extends ConsumerWidget {
             decoration: BoxDecoration(
               color: AppColors.danger.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: AppColors.danger.withValues(alpha: 0.2)),
+              border:
+                  Border.all(color: AppColors.danger.withValues(alpha: 0.2)),
             ),
             child: Row(
               children: [
@@ -222,6 +222,7 @@ class EmergencyContactsScreen extends ConsumerWidget {
                       return _ContactCard(
                         key: ValueKey(contact.id),
                         contact: contact,
+                        index: i,
                         isFirst: i == 0,
                         onEdit: () =>
                             _showEditContactSheet(context, ref, contact),
@@ -261,8 +262,7 @@ class EmergencyContactsScreen extends ConsumerWidget {
               style: AppTextStyles.headlineMedium),
           const SizedBox(height: 8),
           const Text('Ajoutez des proches à alerter\nen cas d\'urgence.',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.bodyMedium),
+              textAlign: TextAlign.center, style: AppTextStyles.bodyMedium),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () => _showAddContactSheet(context, ref),
@@ -289,6 +289,8 @@ class EmergencyContactsScreen extends ConsumerWidget {
     final nameCtrl = TextEditingController(text: contact?.name ?? '');
     final phoneCtrl = TextEditingController(text: contact?.phone ?? '');
     String? selectedRelation = contact?.relation;
+    bool selectedSms = contact?.canReceiveSms ?? true;
+    bool selectedCall = contact?.canReceiveCall ?? true;
 
     final relations = [
       'Conjoint(e)',
@@ -324,7 +326,8 @@ class EmergencyContactsScreen extends ConsumerWidget {
                 // Handle
                 Center(
                   child: Container(
-                    width: 40, height: 4,
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
                       color: AppColors.border,
                       borderRadius: BorderRadius.circular(2),
@@ -354,7 +357,8 @@ class EmergencyContactsScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
 
                 // Téléphone
-                const Text('Numéro de téléphone', style: AppTextStyles.labelLarge),
+                const Text('Numéro de téléphone',
+                    style: AppTextStyles.labelLarge),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: phoneCtrl,
@@ -362,8 +366,8 @@ class EmergencyContactsScreen extends ConsumerWidget {
                   style: AppTextStyles.bodyLarge,
                   decoration: const InputDecoration(
                     hintText: '+237 6XX XXX XXX',
-                    prefixIcon: Icon(Icons.phone_rounded,
-                        color: AppColors.textMuted),
+                    prefixIcon:
+                        Icon(Icons.phone_rounded, color: AppColors.textMuted),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -404,6 +408,31 @@ class EmergencyContactsScreen extends ConsumerWidget {
                     );
                   }).toList(),
                 ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('SMS'),
+                        subtitle: const Text('Recevoir un SMS en cas de SOS'),
+                        value: selectedSms,
+                        onChanged: (value) =>
+                            setSheetState(() => selectedSms = value),
+                      ),
+                    ),
+                    Expanded(
+                      child: SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Appel'),
+                        subtitle: const Text('Recevoir un appel en cas de SOS'),
+                        value: selectedCall,
+                        onChanged: (value) =>
+                            setSheetState(() => selectedCall = value),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 24),
 
                 // Bouton
@@ -428,6 +457,8 @@ class EmergencyContactsScreen extends ConsumerWidget {
                         name: nameCtrl.text.trim(),
                         phone: phoneCtrl.text.trim(),
                         relation: selectedRelation!,
+                        canReceiveSms: selectedSms,
+                        canReceiveCall: selectedCall,
                       );
                       if (isEdit) {
                         ref
@@ -458,21 +489,17 @@ class EmergencyContactsScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
         title: const Text('Supprimer ce contact ?'),
-        content: Text(
-            '${contact.name} ne sera plus alerté en cas de SOS.'),
+        content: Text('${contact.name} ne sera plus alerté en cas de SOS.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Annuler'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.danger),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () {
               Navigator.pop(ctx);
-              ref
-                  .read(emergencyContactsProvider.notifier)
-                  .remove(contact.id);
+              ref.read(emergencyContactsProvider.notifier).remove(contact.id);
             },
             child: const Text('Supprimer'),
           ),
@@ -486,6 +513,7 @@ class EmergencyContactsScreen extends ConsumerWidget {
 
 class _ContactCard extends StatelessWidget {
   final EmergencyContact contact;
+  final int index;
   final bool isFirst;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -493,6 +521,7 @@ class _ContactCard extends StatelessWidget {
   const _ContactCard({
     super.key,
     required this.contact,
+    required this.index,
     required this.isFirst,
     required this.onEdit,
     required this.onDelete,
@@ -503,9 +532,8 @@ class _ContactCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: isFirst
-            ? AppColors.danger.withValues(alpha: 0.06)
-            : AppColors.card,
+        color:
+            isFirst ? AppColors.danger.withValues(alpha: 0.06) : AppColors.card,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isFirst
@@ -534,9 +562,13 @@ class _ContactCard extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
+                      contact.name.isNotEmpty
+                          ? contact.name[0].toUpperCase()
+                          : '?',
                       style: AppTextStyles.titleLarge.copyWith(
-                        color: isFirst ? AppColors.danger : AppColors.textSecondary,
+                        color: isFirst
+                            ? AppColors.danger
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ),
@@ -574,11 +606,9 @@ class _ContactCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      Text(contact.phone,
-                          style: AppTextStyles.bodySmall),
+                      Text(contact.phone, style: AppTextStyles.bodySmall),
                       const SizedBox(height: 2),
-                      Text(contact.relation,
-                          style: AppTextStyles.caption),
+                      Text(contact.relation, style: AppTextStyles.caption),
                     ],
                   ),
                 ),
@@ -597,9 +627,9 @@ class _ContactCard extends StatelessWidget {
                           color: AppColors.danger, size: 20),
                       onPressed: onDelete,
                     ),
-                    const ReorderableDragStartListener(
-                      index: 0,
-                      child: Icon(Icons.drag_handle_rounded,
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: const Icon(Icons.drag_handle_rounded,
                           color: AppColors.textMuted),
                     ),
                   ],

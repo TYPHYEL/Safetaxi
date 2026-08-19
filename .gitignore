@@ -44,3 +44,22 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 .aider*
+
+# Database
+*.sqlite3
+*.db
+
+# Analysis outputs
+*.txt
+!README.md
+
+# Documents and archives
+*.docx
+*.zip
+*.pdf
+
+# Metadata
+.metadata
+
+# Conception docs
+conception/

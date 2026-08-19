@@ -1,5 +1,6 @@
 // lib/features/auth/presentation/screens/driver_documents_screen.dart
-import 'dart:io';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,7 +31,7 @@ enum DocType {
 // ─── Provider pour les documents ─────────────────────────
 
 class DriverDocumentsState {
-  final Map<DocType, File?> files;
+  final Map<DocType, dynamic> files;
   final Map<DocType, bool> uploaded;
   final Map<DocType, String?> errors;
   final bool isSubmitting;
@@ -45,7 +46,7 @@ class DriverDocumentsState {
   });
 
   DriverDocumentsState copyWith({
-    Map<DocType, File?>? files,
+    Map<DocType, dynamic>? files,
     Map<DocType, bool>? uploaded,
     Map<DocType, String?>? errors,
     bool? isSubmitting,
@@ -68,15 +69,27 @@ class DriverDocumentsNotifier extends StateNotifier<DriverDocumentsState> {
 
   Future<void> pickImage(DocType type, ImageSource source) async {
     try {
+      // On web, camera is not available, so use gallery
+      final actualSource = kIsWeb ? ImageSource.gallery : source;
+      
       final XFile? picked = await _picker.pickImage(
-        source: source,
+        source: actualSource,
         maxWidth: 1920,
         maxHeight: 1080,
         imageQuality: 85,
       );
       if (picked == null) return;
 
-      final file = File(picked.path);
+      // On web, use XFile directly; on mobile, convert to File
+      final file = kIsWeb ? picked : File(picked.path);
+
+      // Vérifier que le fichier existe (only on mobile)
+      if (!kIsWeb && !await file.exists()) {
+        state = state.copyWith(
+          errors: {...state.errors, type: 'Fichier introuvable'},
+        );
+        return;
+      }
 
       // Vérifier la taille (max 5MB)
       final sizeMB = await file.length() / (1024 * 1024);
@@ -96,6 +109,7 @@ class DriverDocumentsNotifier extends StateNotifier<DriverDocumentsState> {
       // Upload immédiat
       await _uploadDoc(type, file);
     } catch (e) {
+      _log.e('Pick image error: $e');
       state = state.copyWith(
         errors: {...state.errors, type: 'Erreur: ${e.toString()}'},
       );

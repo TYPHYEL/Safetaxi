@@ -6,7 +6,9 @@ import 'package:safetaxi_cameroun/core/network/api_client.dart';
 import 'package:safetaxi_cameroun/features/auth/data/models/user_model.dart';
 import 'package:safetaxi_cameroun/features/auth/domain/entities/user_entity.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:path/path.dart' as p;
 import 'package:firebase_auth/firebase_auth.dart';
 
 // ─── Providers infrastructure ────────────────────────────
@@ -168,12 +170,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Use backend API for OTP verification (works on web)
       final normalizedPhone = _normalizePhone(phone);
       final pending = state.pendingRegistration;
-      
+
       // Check if driver registration with photos
-      if (pending != null && pending.role == 'driver' && 
-          (pending.licensePhoto != null || pending.vehiclePhoto != null || pending.cniPhoto != null)) {
+      if (pending != null &&
+          pending.role == 'driver' &&
+          (pending.licensePhoto != null ||
+              pending.vehiclePhoto != null ||
+              pending.cniPhoto != null ||
+              pending.profilePhoto != null)) {
         // Use multipart request for file upload
-        final formData = <String, dynamic>{
+        final formData = FormData.fromMap({
           'phone': normalizedPhone,
           'code': code,
           'first_name': pending.firstName,
@@ -181,25 +187,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
           'role': pending.role,
           if (pending.email != null && pending.email!.isNotEmpty)
             'email': pending.email,
-          if (pending.password != null)
-            'password': pending.password,
+          if (pending.password != null) 'password': pending.password,
           if (pending.birthDate != null && pending.birthDate!.isNotEmpty)
             'birth_date': pending.birthDate,
           if (pending.gender != null && pending.gender!.isNotEmpty)
             'gender': pending.gender,
-        };
-        
-        // Add files if present
-        if (pending.licensePhoto != null) {
-          formData['license_photo'] = pending.licensePhoto;
-        }
-        if (pending.vehiclePhoto != null) {
-          formData['vehicle_photo'] = pending.vehiclePhoto;
-        }
-        if (pending.cniPhoto != null) {
-          formData['cni_photo'] = pending.cniPhoto;
-        }
-        
+          if (pending.licensePhoto != null)
+            'license_photo': MultipartFile.fromFileSync(
+              pending.licensePhoto!.path,
+              filename: p.basename(pending.licensePhoto!.path),
+            ),
+          if (pending.vehiclePhoto != null)
+            'vehicle_photo': MultipartFile.fromFileSync(
+              pending.vehiclePhoto!.path,
+              filename: p.basename(pending.vehiclePhoto!.path),
+            ),
+          if (pending.cniPhoto != null)
+            'cni_photo': MultipartFile.fromFileSync(
+              pending.cniPhoto!.path,
+              filename: p.basename(pending.cniPhoto!.path),
+            ),
+          if (pending.profilePhoto != null)
+            'profile_photo': MultipartFile.fromFileSync(
+              pending.profilePhoto!.path,
+              filename: p.basename(pending.profilePhoto!.path),
+            ),
+        });
+
         final resp = await _api.verifyOtpWithFiles(formData);
         final auth = AuthResponse.fromJson(resp.data as Map<String, dynamic>);
         await _saveTokens(auth.accessToken, auth.refreshToken);
@@ -258,6 +272,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       licensePhoto: req.licensePhoto,
       vehiclePhoto: req.vehiclePhoto,
       cniPhoto: req.cniPhoto,
+      profilePhoto: req.profilePhoto,
       birthDate: req.birthDate,
       gender: req.gender,
     );
@@ -282,6 +297,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = UserModel.fromJson(resp.data as Map<String, dynamic>);
       await _saveUser(user);
       state = state.copyWith(user: user);
+    } catch (e) {
+      state = state.copyWith(error: _parseError(e));
+    }
+  }
+
+  Future<void> updateProfilePhoto(File photo) async {
+    state = state.copyWith(status: AuthStatus.loading);
+    try {
+      final resp = await _api.updateProfilePhoto(photo);
+      final user = UserModel.fromJson(resp.data as Map<String, dynamic>);
+      await _saveUser(user);
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        user: user,
+      );
     } catch (e) {
       state = state.copyWith(error: _parseError(e));
     }

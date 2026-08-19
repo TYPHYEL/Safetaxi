@@ -55,7 +55,17 @@ class LocationTrackingService {
       serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         _log.w('Location services are disabled.');
-        return false;
+        // Ouvrir les paramètres de localisation
+        final opened = await Geolocator.openLocationSettings();
+        if (!opened) {
+          _log.w('Failed to open location settings.');
+          return false;
+        }
+        // Réessayer après ouverture
+        serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) {
+          return false;
+        }
       }
 
       permission = await Geolocator.checkPermission();
@@ -68,8 +78,18 @@ class LocationTrackingService {
       }
 
       if (permission == LocationPermission.deniedForever) {
-        _log.w('Location permissions permanently denied.');
-        return false;
+        _log.w('Location permissions permanently denied. Opening app settings...');
+        // Ouvrir les paramètres de l'application pour permettre à l'utilisateur de changer les permissions
+        final opened = await Geolocator.openAppSettings();
+        if (!opened) {
+          _log.w('Failed to open app settings.');
+          return false;
+        }
+        // Réessayer après ouverture
+        permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.deniedForever) {
+          return false;
+        }
       }
 
       return true;

@@ -11,8 +11,10 @@ import 'package:safetaxi_cameroun/config/router/app_router.dart';
 import 'package:safetaxi_cameroun/shared/theme/app_theme.dart';
 import 'package:safetaxi_cameroun/core/network/firebase_service.dart';
 import 'package:safetaxi_cameroun/core/services/location_service.dart';
+import 'package:safetaxi_cameroun/core/services/volume_sos_service.dart';
 import 'package:safetaxi_cameroun/core/services/settings_service.dart';
 import 'package:safetaxi_cameroun/core/services/cache_service.dart';
+import 'package:safetaxi_cameroun/features/sos/presentation/providers/sos_provider.dart';
 import 'package:safetaxi_cameroun/core/constants/app_constants.dart';
 
 // ─── Handler FCM background (top-level function) ─────────
@@ -88,6 +90,8 @@ class SafeTaxiApp extends ConsumerStatefulWidget {
 
 class _SafeTaxiAppState extends ConsumerState<SafeTaxiApp>
     with WidgetsBindingObserver {
+  final _volumeSosService = VolumeSosService();
+
   @override
   void initState() {
     super.initState();
@@ -96,10 +100,21 @@ class _SafeTaxiAppState extends ConsumerState<SafeTaxiApp>
     if (!disableFcmInTests) {
       _setupFcmHandlers();
     }
+    _initVolumeSos();
+  }
+
+  void _initVolumeSos() {
+    _volumeSosService.startListening(_onVolumeSosTrigger);
+  }
+
+  void _onVolumeSosTrigger() {
+    debugPrint('Volume SOS shortcut triggered');
+    ref.read(sosProvider.notifier).triggerSos(SosAlertType.other);
   }
 
   @override
   void dispose() {
+    _volumeSosService.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

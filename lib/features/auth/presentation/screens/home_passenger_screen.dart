@@ -264,16 +264,16 @@ class _HomePassengerScreenState extends ConsumerState<HomePassengerScreen>
         onTap: () => ctx.push(AppRoutes.scanTaxi),
       ),
       _QuickAction(
-        label: 'Carte\ntaxis',
-        icon: Icons.map_rounded,
+        label: 'Dépôt\nPrivé',
+        icon: Icons.local_taxi_rounded,
         color: AppColors.driverColor,
-        onTap: () => ctx.push(AppRoutes.map),
+        onTap: () => ctx.push(AppRoutes.depositRequest),
       ),
       _QuickAction(
-        label: 'Mes\ntrajets',
-        icon: Icons.history_rounded,
+        label: 'Carte\ntaxis',
+        icon: Icons.map_rounded,
         color: AppColors.ownerColor,
-        onTap: () => ctx.push(AppRoutes.history),
+        onTap: () => ctx.push(AppRoutes.map),
       ),
       _QuickAction(
         label: 'SOS\nUrgence',

@@ -34,6 +34,7 @@ INSTALLED_APPS += [
     'sos',
     'api',
     'ocr',
+    'verification',
 ]
 INSTALLED_APPS += [
     'rest_framework_simplejwt.token_blacklist',

@@ -1,5 +1,6 @@
 // lib/features/auth/presentation/screens/register_screen.dart
-import 'dart:io';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -28,13 +29,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscure = true;
   bool _isLoading = false;
   bool _acceptTerms = false;
-  File? _licensePhoto;
-  File? _vehiclePhoto;
-  File? _cniPhoto;
+  dynamic _licensePhoto; // XFile for web, File for mobile
+  dynamic _cniPhoto;
+  dynamic _vehicleDocPhoto;
+  dynamic _profilePhoto;
   Map<String, dynamic>? _cniValidation;
   Map<String, dynamic>? _licenseValidation;
-  Map<String, dynamic>? _vehicleValidation;
   Map<String, dynamic>? _documentComparison;
+  Map<String, dynamic>? _vehicleDocValidation;
+  Map<String, dynamic>? _profilePhotoValidation;
 
   @override
   void dispose() {
@@ -46,48 +49,157 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
+  Widget _buildImage(dynamic imageFile) {
+    if (kIsWeb && imageFile != null) {
+      // On web, use Image.network with the XFile path
+      return Image.network(
+        imageFile.path,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+      );
+    } else if (imageFile != null) {
+      // On mobile, use Image.file
+      return Image.file(
+        imageFile,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   Future<void> _pickLicensePhoto() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(
-      source: ImageSource.camera,
+      source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
       imageQuality: 80,
     );
     if (pickedFile != null && mounted) {
-      setState(() => _licensePhoto = File(pickedFile.path));
-      // Validation OCR désactivée temporairement pour éviter les erreurs
-      // await _validateLicense();
-      // if (_cniPhoto != null) {
-      //   await _compareDocuments();
-      // }
+      setState(() => _licensePhoto = pickedFile);
+      // Intelligent license verification with EasyOCR
+      await _validateLicenseIntelligent();
     }
   }
 
-  Future<void> _pickVehiclePhoto() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 80,
-    );
-    if (pickedFile != null && mounted) {
-      setState(() => _vehiclePhoto = File(pickedFile.path));
-      // Validation OCR désactivée temporairement pour éviter les erreurs
-      // await _validateVehicle();
+  Future<void> _validateLicenseIntelligent() async {
+    if (_licensePhoto == null) return;
+
+    try {
+      setState(() => _isLoading = true);
+      
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.verifyLicensePlate(_licensePhoto);
+      
+      if (mounted && response.data != null) {
+        setState(() => _licenseValidation = response.data as Map<String, dynamic>);
+      }
+    } catch (e) {
+      debugPrint('Intelligent license validation error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _pickCniPhoto() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(
-      source: ImageSource.camera,
+      source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
       imageQuality: 80,
     );
     if (pickedFile != null && mounted) {
-      setState(() => _cniPhoto = File(pickedFile.path));
-      // Validation OCR désactivée temporairement pour éviter les erreurs
-      // await _validateCni();
-      // if (_licensePhoto != null) {
-      //   await _compareDocuments();
-      // }
+      setState(() => _cniPhoto = pickedFile);
+      // Intelligent CNI verification with EasyOCR
+      await _validateCniIntelligent();
+    }
+  }
+
+  Future<void> _validateCniIntelligent() async {
+    if (_cniPhoto == null) return;
+
+    try {
+      setState(() => _isLoading = true);
+      
+      final apiClient = ref.read(apiClientProvider);
+      final fullName = _nameCtrl.text.trim();
+      final response = await apiClient.verifyCniDocument(
+        _cniPhoto!,
+        expectedName: fullName.isNotEmpty ? fullName : null,
+      );
+      
+      if (mounted && response.data != null) {
+        setState(() => _cniValidation = response.data as Map<String, dynamic>);
+      }
+    } catch (e) {
+      debugPrint('Intelligent CNI validation error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pickVehicleDocPhoto() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
+      imageQuality: 80,
+    );
+    if (pickedFile != null && mounted) {
+      setState(() => _vehicleDocPhoto = pickedFile);
+      // Intelligent vehicle document verification
+      await _validateVehicleDocumentIntelligent();
+    }
+  }
+
+  Future<void> _validateVehicleDocumentIntelligent() async {
+    if (_vehicleDocPhoto == null) return;
+
+    try {
+      setState(() => _isLoading = true);
+      
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.verifyVehicleDocument(_vehicleDocPhoto);
+      
+      if (mounted && response.data != null) {
+        setState(() => _vehicleDocValidation = response.data as Map<String, dynamic>);
+      }
+    } catch (e) {
+      debugPrint('Intelligent vehicle document validation error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pickProfilePhoto() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
+      imageQuality: 90,
+      preferredCameraDevice: CameraDevice.front,
+    );
+    if (pickedFile != null && mounted) {
+      setState(() => _profilePhoto = pickedFile);
+      // Validate profile photo with face detection
+      await _validateProfilePhoto();
+    }
+  }
+
+  Future<void> _validateProfilePhoto() async {
+    if (_profilePhoto == null) return;
+
+    try {
+      setState(() => _isLoading = true);
+      
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.detectFace(_profilePhoto!);
+      
+      if (mounted && response.data != null) {
+        setState(() => _profilePhotoValidation = response.data as Map<String, dynamic>);
+      }
+    } catch (e) {
+      debugPrint('Profile photo validation error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -123,21 +235,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   // ignore: unused_element
-  Future<void> _validateVehicle() async {
-    if (_vehiclePhoto == null) return;
-
-    try {
-      final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.validateVehicle(_vehiclePhoto!);
-      if (mounted && response.data != null) {
-        setState(
-            () => _vehicleValidation = response.data as Map<String, dynamic>);
-      }
-    } catch (e) {
-      debugPrint('Vehicle validation error: $e');
-    }
-  }
-
   // ignore: unused_element
   Future<void> _compareDocuments() async {
     if (_cniPhoto == null || _licensePhoto == null) return;
@@ -173,6 +270,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     // Validation des photos pour les chauffeurs
     if (widget.role == 'driver') {
+      if (_profilePhoto == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Veuillez ajouter une photo de profil avec votre visage visible.')),
+        );
+        return;
+      }
       if (_licensePhoto == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -180,18 +284,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         );
         return;
       }
-      if (_vehiclePhoto == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'Veuillez ajouter une photo de votre véhicule avec la plaque visible.')),
-        );
-        return;
-      }
       if (_cniPhoto == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Veuillez ajouter une photo de votre CNI.')),
+              content: Text(
+                  'Veuillez ajouter une photo de votre CNI avec le document visible.')),
         );
         return;
       }
@@ -199,6 +296,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Veuillez entrer votre date de naissance.')),
+        );
+        return;
+      }
+    }
+
+    // Validation des photos pour les passagers et propriétaires
+    if (widget.role == 'passenger' || widget.role == 'owner') {
+      if (_cniPhoto == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'Veuillez ajouter une photo de votre CNI avec le document visible.')),
         );
         return;
       }
@@ -229,8 +338,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
             password: _passwordCtrl.text,
             licensePhoto: widget.role == 'driver' ? _licensePhoto : null,
-            vehiclePhoto: widget.role == 'driver' ? _vehiclePhoto : null,
-            cniPhoto: widget.role == 'driver' ? _cniPhoto : null,
+            cniPhoto: _cniPhoto,
+            profilePhoto: widget.role == 'driver' ? _profilePhoto : null,
             birthDate:
                 widget.role == 'driver' ? _birthDateCtrl.text.trim() : null,
             gender: widget.role == 'driver' ? _gender : null,
@@ -244,18 +353,117 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   Widget _buildValidationResult(
       Map<String, dynamic> validation, String docType) {
+    final isValid = validation['valid'] as bool? ?? false;
+    final qualityCheck = validation['quality_check'] as Map<String, dynamic>?;
+    final extractedInfo = validation['extracted_info'] as Map<String, dynamic>?;
+    final confidence = validation['confidence'] as double? ?? 0.0;
+    final message = validation['message'] as String?;
+    final error = validation['error'] as String?;
+
+    // Handle error case
+    if (error != null) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.red.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.red, width: 1),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline_rounded, color: Colors.red, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Erreur: $error',
+                style: TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Handle intelligent verification results
+    if (extractedInfo != null) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isValid
+              ? Colors.green.withValues(alpha: 0.1)
+              : Colors.orange.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isValid ? Colors.green : Colors.orange,
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isValid
+                      ? Icons.check_circle_rounded
+                      : Icons.info_rounded,
+                  color: isValid ? Colors.green : Colors.orange,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isValid ? 'Document valide' : 'Document à vérifier',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isValid ? Colors.green : Colors.orange,
+                    fontSize: 12,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  'Confiance: ${confidence.toStringAsFixed(0)}%',
+                  style: TextStyle(
+                    color: isValid ? Colors.green : Colors.orange,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Show extracted information
+            if (extractedInfo['name'] != null)
+              _buildInfoRow('Nom:', extractedInfo['name'].toString()),
+            if (extractedInfo['first_name'] != null)
+              _buildInfoRow('Prénom:', extractedInfo['first_name'].toString()),
+            if (extractedInfo['birth_date'] != null)
+              _buildInfoRow('Date naissance:', extractedInfo['birth_date'].toString()),
+            if (extractedInfo['id_number'] != null)
+              _buildInfoRow('Numéro ID:', extractedInfo['id_number'].toString()),
+            if (extractedInfo['plate_number'] != null)
+              _buildInfoRow('Plaque détectée:', extractedInfo['plate_number'].toString()),
+            // Show quality check
+            if (qualityCheck != null) ...[
+              const SizedBox(height: 8),
+              _buildQualityInfo(qualityCheck),
+            ],
+          ],
+        ),
+      );
+    }
+
+    // Fallback for old validation format
     final parsedInfo = validation['parsed_info'] as Map<String, dynamic>?;
-    final confidence = parsedInfo?['confidence'] as double? ?? 0.0;
+    final oldConfidence = parsedInfo?['confidence'] as double? ?? 0.0;
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: confidence > 0.5
+        color: oldConfidence > 0.5
             ? Colors.green.withValues(alpha: 0.1)
             : Colors.orange.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: confidence > 0.5 ? Colors.green : Colors.orange,
+          color: oldConfidence > 0.5 ? Colors.green : Colors.orange,
           width: 1,
         ),
       ),
@@ -265,10 +473,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           Row(
             children: [
               Icon(
-                confidence > 0.5
+                oldConfidence > 0.5
                     ? Icons.check_circle_rounded
                     : Icons.info_rounded,
-                color: confidence > 0.5 ? Colors.green : Colors.orange,
+                color: oldConfidence > 0.5 ? Colors.green : Colors.orange,
                 size: 16,
               ),
               const SizedBox(width: 8),
@@ -276,7 +484,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 'Infos extraites ($docType)',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: confidence > 0.5 ? Colors.green : Colors.orange,
+                  color: oldConfidence > 0.5 ? Colors.green : Colors.orange,
                   fontSize: 12,
                 ),
               ),
@@ -299,7 +507,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               _buildInfoRow('Sexe:', parsedInfo['sex'].toString()),
           ] else
             Text(
-              'Aucune information extraite',
+              message ?? 'Aucune information extraite',
               style: TextStyle(
                 color: AppColors.textMuted,
                 fontSize: 11,
@@ -307,6 +515,94 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildProfilePhotoValidationResult(Map<String, dynamic> validation) {
+    final isValid = validation['valid'] as bool? ?? false;
+    final faceDetected = validation['face_detected'] as bool? ?? false;
+    final qualityCheck = validation['quality_check'] as Map<String, dynamic>?;
+    final message = validation['message'] as String?;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isValid && faceDetected
+            ? Colors.green.withValues(alpha: 0.1)
+            : Colors.orange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isValid && faceDetected ? Colors.green : Colors.orange,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isValid && faceDetected
+                    ? Icons.check_circle_rounded
+                    : Icons.info_rounded,
+                color: isValid && faceDetected ? Colors.green : Colors.orange,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                message ?? 'Validation photo de profil',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isValid && faceDetected ? Colors.green : Colors.orange,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          if (qualityCheck != null) ...[
+            const SizedBox(height: 8),
+            _buildQualityInfo(qualityCheck),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQualityInfo(Map<String, dynamic> qualityCheck) {
+    final qualityScore = qualityCheck['quality_score'] as int? ?? 0;
+    final issues = qualityCheck['issues'] as List<dynamic>? ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.photo_camera_rounded, size: 14, color: AppColors.textMuted),
+            const SizedBox(width: 4),
+            Text(
+              'Qualité image: $qualityScore/100',
+              style: TextStyle(
+                color: qualityScore >= 50 ? Colors.green : Colors.orange,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        if (issues.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          ...issues.map((issue) => Padding(
+                padding: const EdgeInsets.only(left: 18, top: 2),
+                child: Text(
+                  '• $issue',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontSize: 10,
+                  ),
+                ),
+              )),
+        ],
+      ],
     );
   }
 
@@ -661,6 +957,81 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                 // Champs spécifiques pour les chauffeurs
                 if (widget.role == 'driver') ...[
+                  _label('Photo de profil (visage visible)'),
+                  InkWell(
+                    onTap: _pickProfilePhoto,
+                    child: Container(
+                      height: 140,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _profilePhoto == null
+                              ? AppColors.textMuted.withValues(alpha: 0.3)
+                              : AppColors.primary,
+                          width: 2,
+                        ),
+                      ),
+                      child: _profilePhoto == null
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.person_rounded,
+                                  size: 48,
+                                  color: AppColors.textMuted,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Prendre une photo de profil',
+                                  style: TextStyle(
+                                    color: AppColors.textMuted,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Assurez-vous que votre visage est visible',
+                                  style: TextStyle(
+                                    color: AppColors.textMuted.withValues(alpha: 0.7),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Stack(
+                                children: [
+                                  _buildImage(_profilePhoto),
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(alpha: 0.5),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.check_circle_rounded,
+                                        color: Colors.green,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                    ),
+                  ),
+                  if (_profilePhotoValidation != null) ...[
+                    const SizedBox(height: 8),
+                    _buildProfilePhotoValidationResult(_profilePhotoValidation!),
+                  ],
+                  const SizedBox(height: 16),
+
                   _label('Date de naissance'),
                   TextFormField(
                     controller: _birthDateCtrl,
@@ -718,11 +1089,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             )
                           : ClipRRect(
                               borderRadius: BorderRadius.circular(10),
-                              child: Image.file(
-                                _licensePhoto!,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                              ),
+                              child: _buildImage(_licensePhoto),
                             ),
                     ),
                   ),
@@ -732,57 +1099,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ],
                   const SizedBox(height: 16),
 
-                  _label('Photo du véhicule avec plaque'),
-                  InkWell(
-                    onTap: _pickVehiclePhoto,
-                    child: Container(
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _vehiclePhoto == null
-                              ? AppColors.textMuted.withValues(alpha: 0.3)
-                              : AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
-                      child: _vehiclePhoto == null
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.directions_car_rounded,
-                                  size: 40,
-                                  color: AppColors.textMuted,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Prendre une photo (plaque visible)',
-                                  style: TextStyle(
-                                    color: AppColors.textMuted,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            )
-                          : ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.file(
-                                _vehiclePhoto!,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                              ),
-                            ),
-                    ),
-                  ),
-                  if (_vehicleValidation != null) ...[
-                    const SizedBox(height: 8),
-                    _buildVehicleValidationResult(_vehicleValidation!),
-                  ],
-                  const SizedBox(height: 16),
-
-                  _label('Photo de la CNI'),
+                  _label('Photo de la CNI (document lisible)'),
                   InkWell(
                     onTap: _pickCniPhoto,
                     child: Container(
@@ -808,7 +1125,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Prendre une photo de la CNI',
+                                  'Prendre une photo claire de la CNI',
                                   style: TextStyle(
                                     color: AppColors.textMuted,
                                     fontSize: 14,
@@ -818,11 +1135,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             )
                           : ClipRRect(
                               borderRadius: BorderRadius.circular(10),
-                              child: Image.file(
-                                _cniPhoto!,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                              ),
+                              child: _buildImage(_cniPhoto),
                             ),
                     ),
                   ),
@@ -837,6 +1150,55 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     _buildDocumentComparisonResult(_documentComparison!),
                     const SizedBox(height: 16),
                   ],
+                ],
+
+                // Champs spécifiques pour les passagers et propriétaires (CNI requise)
+                if (widget.role == 'passenger' || widget.role == 'owner') ...[
+                  _label('Photo de la CNI (document lisible)'),
+                  InkWell(
+                    onTap: _pickCniPhoto,
+                    child: Container(
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _cniPhoto == null
+                              ? AppColors.textMuted.withValues(alpha: 0.3)
+                              : AppColors.primary,
+                          width: 2,
+                        ),
+                      ),
+                      child: _cniPhoto == null
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.badge_rounded,
+                                  size: 40,
+                                  color: AppColors.textMuted,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Prendre une photo claire de la CNI',
+                                  style: TextStyle(
+                                    color: AppColors.textMuted,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: _buildImage(_cniPhoto),
+                            ),
+                    ),
+                  ),
+                  if (_cniValidation != null) ...[
+                    const SizedBox(height: 8),
+                    _buildValidationResult(_cniValidation!, 'CNI'),
+                  ],
+                  const SizedBox(height: 16),
                 ],
 
                 // Conditions

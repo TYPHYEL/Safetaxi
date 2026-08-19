@@ -10,7 +10,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 String _resolveHost() {
   if (kIsWeb) return 'http://127.0.0.1:8000';
   try {
-    if (Platform.isAndroid) return 'http://192.168.0.64:8000';
+    if (Platform.isAndroid) return 'http://192.168.0.61:8000';
   } catch (_) {}
   return 'http://127.0.0.1:8000';
 }
@@ -21,6 +21,7 @@ class AppConstants {
   static final String wsUrl = '${_resolveHost().replaceFirst('http', 'ws')}/ws';
   static const int connectTimeout = 30;
   static const int receiveTimeout = 30;
+  static const int uploadTimeout = 120;
 
   // Firebase paths
   static const String firebaseTripsPath = 'trips';
@@ -83,6 +84,8 @@ class AppRoutes {
   static const String homePassenger = '/home-passenger';
   static const String scanTaxi = '/scan-taxi';
   static const String passengers = '/passengers';
+  static const String depositRequest = '/deposit-request';
+  static const String depositNotification = '/deposit-notification';
 
   // Chauffeur
   static const String homeDriver = '/home-driver';

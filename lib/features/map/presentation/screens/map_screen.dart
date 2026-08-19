@@ -55,7 +55,8 @@ final _demoTaxis = [
 
 class MapScreen extends ConsumerStatefulWidget {
   final String? tripId;
-  const MapScreen({super.key, this.tripId});
+  final List<Map<String, dynamic>>? taxis;
+  const MapScreen({super.key, this.tripId, this.taxis});
   @override
   ConsumerState<MapScreen> createState() => _MapScreenState();
 }
@@ -122,6 +123,19 @@ class _MapScreenState extends ConsumerState<MapScreen>
     }
   }
 
+  LatLng? _taxiPosition(Map<String, dynamic> taxi) {
+    final lat = taxi['lat'] ?? taxi['latitude'];
+    final lng = taxi['lng'] ?? taxi['longitude'];
+    if (lat is num && lng is num) {
+      return LatLng(lat.toDouble(), lng.toDouble());
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>> get _displayTaxis {
+    return widget.taxis ?? _demoTaxis;
+  }
+
   @override
   Widget build(BuildContext context) {
     // Si tripId fourni, surveiller la position du taxi en temps réel
@@ -159,13 +173,6 @@ class _MapScreenState extends ConsumerState<MapScreen>
                 maxZoom: 19,
               ),
 
-              // Attribution obligatoire OpenStreetMap
-              const RichAttributionWidget(
-                attributions: [
-                  TextSourceAttribution('OpenStreetMap contributors'),
-                ],
-              ),
-
               // Cercle de zone autour de ma position
               if (_myPos != null)
                 CircleLayer(
@@ -184,97 +191,61 @@ class _MapScreenState extends ConsumerState<MapScreen>
               // Marqueurs des taxis (mode liste)
               if (_showTaxis && widget.tripId == null)
                 MarkerLayer(
-                  markers: _demoTaxis.asMap().entries.map((e) {
-                    final taxi = e.value;
-                    final idx = e.key;
-                    final isSelec = _selectedTaxi == idx;
-                    return Marker(
-                      point: LatLng(
-                        taxi['lat'] as double,
-                        taxi['lng'] as double,
-                      ),
-                      width: isSelec ? 52 : 44,
-                      height: isSelec ? 52 : 44,
-                      child: GestureDetector(
-                        onTap: () => setState(() {
-                          _selectedTaxi = isSelec ? null : idx;
-                          _mapCtrl.move(
-                            LatLng(
-                              taxi['lat'] as double,
-                              taxi['lng'] as double,
-                            ),
-                            15.5,
-                          );
-                        }),
-                        child: AnimatedBuilder(
-                          animation: _pulseCtrl,
-                          builder: (_, __) => Transform.scale(
-                            scale: isSelec ? _pulseAnim.value : 1.0,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: isSelec
-                                    ? AppColors.taxiYellow
-                                    : AppColors.surface,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: AppColors.taxiYellow,
-                                  width: isSelec ? 2.5 : 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.taxiYellow
-                                        .withValues(alpha: isSelec ? 0.4 : 0.2),
-                                    blurRadius: isSelec ? 16 : 8,
+                  markers: _displayTaxis
+                      .asMap()
+                      .entries
+                      .map((e) {
+                        final taxi = e.value;
+                        final idx = e.key;
+                        final position = _taxiPosition(taxi);
+                        if (position == null) return null;
+                        final isSelec = _selectedTaxi == idx;
+                        return Marker(
+                          point: position,
+                          width: isSelec ? 52 : 44,
+                          height: isSelec ? 52 : 44,
+                          child: GestureDetector(
+                            onTap: () => setState(() {
+                              _selectedTaxi = isSelec ? null : idx;
+                              _mapCtrl.move(position, 15.5);
+                            }),
+                            child: AnimatedBuilder(
+                              animation: _pulseCtrl,
+                              builder: (_, __) => Transform.scale(
+                                scale: isSelec ? _pulseAnim.value : 1.0,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: isSelec
+                                        ? AppColors.taxiYellow
+                                        : AppColors.surface,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: AppColors.taxiYellow,
+                                      width: isSelec ? 2.5 : 1.5,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.taxiYellow.withValues(
+                                            alpha: isSelec ? 0.4 : 0.2),
+                                        blurRadius: isSelec ? 16 : 8,
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              child: Icon(
-                                Icons.local_taxi_rounded,
-                                color:
-                                    isSelec ? Colors.white : AppColors.taxiYellow,
-                                size: isSelec ? 26 : 22,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-
-              // Marqueur taxi suivi (mode trajet actif)
-              if (widget.tripId != null && tripLoc != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: LatLng(tripLoc.lat, tripLoc.lng),
-                      width: 56,
-                      height: 56,
-                      child: AnimatedBuilder(
-                        animation: _pulseCtrl,
-                        builder: (_, __) => Transform.scale(
-                          scale: _pulseAnim.value,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color:
-                                      AppColors.primary.withValues(alpha: 0.5),
-                                  blurRadius: 20,
-                                  spreadRadius: 4,
+                                  child: Icon(
+                                    Icons.local_taxi_rounded,
+                                    color: isSelec
+                                        ? Colors.white
+                                        : AppColors.taxiYellow,
+                                    size: isSelec ? 26 : 22,
+                                  ),
                                 ),
-                              ],
+                              ),
                             ),
-                            child: const Icon(Icons.local_taxi_rounded,
-                                color: Colors.white, size: 28),
                           ),
-                        ),
-                      ),
-                    ),
-                  ],
+                        );
+                      })
+                      .whereType<Marker>()
+                      .toList(),
                 ),
 
               // Ma position
@@ -283,20 +254,29 @@ class _MapScreenState extends ConsumerState<MapScreen>
                   markers: [
                     Marker(
                       point: _myPos!,
-                      width: 20,
-                      height: 20,
+                      width: 60,
+                      height: 60,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: AppColors.driverColor,
+                          color: Colors.red,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                          border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [
                             BoxShadow(
-                              color:
-                                  AppColors.driverColor.withValues(alpha: 0.4),
-                              blurRadius: 8,
+                              color: Colors.red.withValues(alpha: 0.4),
+                              blurRadius: 12,
                             ),
                           ],
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Vous',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
                     ),

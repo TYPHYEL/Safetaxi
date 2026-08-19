@@ -33,11 +33,14 @@ class _MyTaxisScreenState extends ConsumerState<MyTaxisScreen> {
       final parsed = <Map<String, dynamic>>[];
 
       if (data is List) {
-        parsed.addAll(data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+        parsed.addAll(
+            data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
       } else if (data is Map) {
         final results = data['results'];
         if (results is List) {
-          parsed.addAll(results.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+          parsed.addAll(results
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e)));
         }
       }
 
@@ -61,6 +64,13 @@ class _MyTaxisScreenState extends ConsumerState<MyTaxisScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_outline_rounded),
+            tooltip: 'Mon compte',
+            onPressed: () => context.push(AppRoutes.profil),
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -84,8 +94,8 @@ class _MyTaxisScreenState extends ConsumerState<MyTaxisScreen> {
               size: 64, color: AppColors.textMuted),
           const SizedBox(height: 16),
           Text('Aucun taxi enregistré',
-              style: AppTextStyles.titleMedium.copyWith(
-                  color: AppColors.textSecondary)),
+              style: AppTextStyles.titleMedium
+                  .copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: 8),
           const Text('Ajoutez votre premier taxi',
               style: AppTextStyles.bodySmall),
@@ -146,11 +156,10 @@ class _TaxiCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(displayInfo.plate,
-                          style: AppTextStyles.headlineMedium.copyWith(
-                              color: AppColors.ownerColor)),
+                          style: AppTextStyles.headlineMedium
+                              .copyWith(color: AppColors.ownerColor)),
                       const SizedBox(height: 4),
-                      Text(displayInfo.label,
-                          style: AppTextStyles.bodySmall),
+                      Text(displayInfo.label, style: AppTextStyles.bodySmall),
                     ],
                   ),
                 ),
@@ -163,7 +172,8 @@ class _TaxiCard extends StatelessWidget {
             if (hasActiveDriver) ...[
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
@@ -175,8 +185,8 @@ class _TaxiCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       'Conduit par: ${taxi['active_driver']['first_name']} ${taxi['active_driver']['last_name']}',
-                      style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.primary),
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: AppColors.primary),
                     ),
                   ],
                 ),
@@ -193,7 +203,8 @@ class _StatusIndicator extends StatelessWidget {
   final bool isActive;
   final bool hasActiveDriver;
 
-  const _StatusIndicator({required this.isActive, required this.hasActiveDriver});
+  const _StatusIndicator(
+      {required this.isActive, required this.hasActiveDriver});
 
   @override
   Widget build(BuildContext context) {
@@ -216,8 +227,8 @@ class _StatusIndicator extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Text('Inactif',
-                style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textMuted)),
+                style:
+                    AppTextStyles.caption.copyWith(color: AppColors.textMuted)),
           ],
         ),
       );
@@ -248,8 +259,8 @@ class _StatusIndicator extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Text('En service',
-                style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primary)),
+                style:
+                    AppTextStyles.caption.copyWith(color: AppColors.primary)),
           ],
         ),
       );
@@ -273,11 +284,9 @@ class _StatusIndicator extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text('Disponible',
-              style:
-                  AppTextStyles.caption.copyWith(color: AppColors.warning)),
+              style: AppTextStyles.caption.copyWith(color: AppColors.warning)),
         ],
       ),
     );
   }
 }
-

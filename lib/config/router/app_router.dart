@@ -20,6 +20,8 @@ import 'package:safetaxi_cameroun/features/trajet/presentation/screens/trip_acti
 import 'package:safetaxi_cameroun/features/trajet/presentation/screens/scan_taxi_screen.dart';
 import 'package:safetaxi_cameroun/features/trajet/presentation/screens/passengers_screen.dart';
 import 'package:safetaxi_cameroun/features/trajet/presentation/screens/history_screen.dart';
+import 'package:safetaxi_cameroun/features/trajet/presentation/screens/deposit_request_screen.dart';
+import 'package:safetaxi_cameroun/features/trajet/presentation/screens/deposit_notification_screen.dart';
 import 'package:safetaxi_cameroun/features/map/presentation/screens/map_screen.dart'
     hide NotationScreen, AdminDashboardScreen, AdminDriversScreen;
 import 'package:safetaxi_cameroun/features/sos/presentation/screens/sos_screen.dart';
@@ -147,6 +149,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.scanTaxi,
         builder: (_, __) => const ScanTaxiScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.depositRequest,
+        builder: (_, __) => const DepositRequestScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.depositNotification,
+        builder: (_, state) {
+          final depositId = state.uri.queryParameters['depositId'] ?? '';
+          // For now, we'll need to fetch the deposit data
+          // In a real app, you might pass the deposit object via state
+          return const DepositNotificationScreen(deposit: null);
+        },
       ),
 
       // ── Chauffeur ───────────────────────────────────────
