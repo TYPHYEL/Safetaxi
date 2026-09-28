@@ -9,7 +9,13 @@ from .views import (
     VerifyOtpView,
     ProfileView,
 )
-from users.views import FirebaseLoginView
+from users.views import (
+    FirebaseLoginView,
+    EmergencyContactViewSet,
+    TrustScoreView,
+    FCMTokenView,
+    ProfileUpdateView,
+)
 from taxis.views import TaxiViewSet
 from trips.views import TripViewSet, DepositViewSet
 from sos.views import IncidentViewSet
@@ -37,6 +43,7 @@ router.register(r'devices', DeviceViewSet)
 router.register(r'rotations', DriverRotationViewSet)
 router.register(r'ai', AIViewSet, basename='ai')
 router.register(r'document-validation', DocumentValidationViewSet, basename='document-validation')
+router.register(r'emergency-contacts', EmergencyContactViewSet, basename='api-emergency-contact')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -49,10 +56,18 @@ urlpatterns = [
     path('auth/otp/send/', SendOtpView.as_view(), name='auth-otp-send'),
     path('auth/otp/verify/', VerifyOtpView.as_view(), name='auth-otp-verify'),
     path('auth/profile/', ProfileView.as_view(), name='auth-profile'),
+    path('auth/profile/update/', ProfileUpdateView.as_view(), name='auth-profile-update'),
+    path('auth/profile/fcm-token/', FCMTokenView.as_view(), name='auth-fcm-token'),
+    path('auth/trust-score/', TrustScoreView.as_view(), name='auth-trust-score'),
     # Verification endpoints
     path('verification/', include((verification_urls, 'verification'), namespace='verification')),
     # Alias pour compatibilité frontend
     path('sos/alert/', IncidentViewSet.as_view({'post': 'create'}), name='sos-alert'),
+    path('sos/trigger/', IncidentViewSet.as_view({'post': 'trigger'}), name='sos-trigger'),
+    path('sos/active/', IncidentViewSet.as_view({'get': 'active'}), name='sos-active'),
+    path('sos/my/', IncidentViewSet.as_view({'get': 'my'}), name='sos-my'),
+    path('sos/report/', IncidentViewSet.as_view({'post': 'report'}), name='sos-report'),
+    path('sos/<str:pk>/resolve/', IncidentViewSet.as_view({'post': 'resolve'}), name='sos-resolve'),
     # Trip start endpoint for frontend compatibility
     path('trips/start/', TripViewSet.as_view({'post': 'create'}), name='trips-start'),
     # Admin endpoints
@@ -60,4 +75,5 @@ urlpatterns = [
     path('admin/drivers/<str:pk>/approve/', UserViewSet.as_view({'post': 'approve_driver'}), name='admin-approve-driver'),
     path('admin/drivers/<str:pk>/reject/', UserViewSet.as_view({'post': 'reject_driver'}), name='admin-reject-driver'),
     path('admin/dashboard/', UserViewSet.as_view({'get': 'dashboard'}), name='admin-dashboard'),
+    path('admin/check/', UserViewSet.as_view({'get': 'check_admin'}), name='admin-check'),
 ]
