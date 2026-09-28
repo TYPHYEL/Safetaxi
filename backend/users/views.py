@@ -14,32 +14,86 @@ from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import CustomUser, DriverProfile, PhoneOTP
-from .serializers import UserSerializer, RegisterSerializer, DriverProfileSerializer
+from .models import CustomUser, DriverProfile, PhoneOTP, EmergencyContact
+from .serializers import (
+    UserSerializer,
+    RegisterSerializer,
+    DriverProfileSerializer,
+    EmergencyContactSerializer,
+    TrustScoreSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
 # Firebase Admin SDK initialization
 try:
+    import os
+    import json
+
     import firebase_admin
     from firebase_admin import credentials as fb_credentials, auth
-    import os
-
-    # Chemin absolu basé sur l'emplacement de ce fichier (users/views.py)
-    # → remonte à backend/ puis cherche dans safetaxi_backend/
-    _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-    _BACKEND_DIR = os.path.dirname(_THIS_DIR)
-    _DEFAULT_CREDS = os.path.join(_BACKEND_DIR, 'safetaxi_backend', 'firebase-service-account.json')
-
-    firebase_creds_path = os.environ.get('FIREBASE_CREDENTIALS', _DEFAULT_CREDS)
 
     if not firebase_admin._apps:
-        if os.path.exists(firebase_creds_path):
-            cred = fb_credentials.Certificate(firebase_creds_path)
-            firebase_admin.initialize_app(cred)
-            print(f"Firebase Admin SDK initialized: {firebase_creds_path}")
+
+        # ============================================================
+        # PRODUCTION : Render
+        # ============================================================
+        firebase_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+
+        if firebase_json:
+            try:
+                firebase_config = json.loads(firebase_json)
+
+                cred = fb_credentials.Certificate(firebase_config)
+
+                firebase_admin.initialize_app(cred)
+
+                print(
+                    "Firebase Admin SDK initialized "
+                    "from FIREBASE_CREDENTIALS_JSON"
+                )
+
+            except Exception as e:
+                print(
+                    f"Firebase environment initialization error: {e}"
+                )
+
         else:
-            print(f"Firebase credentials not found at: {firebase_creds_path}")
+            # ========================================================
+            # LOCAL : fichier firebase-service-account.json
+            # ========================================================
+            _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+            _BACKEND_DIR = os.path.dirname(_THIS_DIR)
+
+            _DEFAULT_CREDS = os.path.join(
+                _BACKEND_DIR,
+                "safetaxi_backend",
+                "firebase-service-account.json",
+            )
+
+            firebase_creds_path = os.environ.get(
+                "FIREBASE_CREDENTIALS",
+                _DEFAULT_CREDS,
+            )
+
+            if os.path.exists(firebase_creds_path):
+                cred = fb_credentials.Certificate(
+                    firebase_creds_path
+                )
+
+                firebase_admin.initialize_app(cred)
+
+                print(
+                    f"Firebase Admin SDK initialized from file: "
+                    f"{firebase_creds_path}"
+                )
+
+            else:
+                print(
+                    f"Firebase credentials not found at: "
+                    f"{firebase_creds_path}"
+                )
+
 except Exception as e:
     print(f"Firebase initialization error: {e}")
 
@@ -349,6 +403,65 @@ class FirebaseLoginView(APIView):
                 {'detail': f'Firebase verification failed: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+class EmergencyContactViewSet(viewsets.ModelViewSet):
+    serializer_class = EmergencyContactSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff:
+            return EmergencyContact.objects.select_related('user').all()
+        return EmergencyContact.objects.filter(user=user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ProfileUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+        updates = request.data
+
+        for field in ('first_name', 'last_name', 'email'):
+            if field in updates:
+                setattr(user, field, updates[field])
+
+        if 'role' in updates and updates['role'] in {'passenger', 'driver', 'owner', 'admin'}:
+            user.role = updates['role']
+
+        user.save()
+        return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+
+
+class FCMTokenView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        token = (request.data.get('token') or '').strip()
+        platform = (request.data.get('platform') or 'android').strip() or 'android'
+
+        if not token:
+            return Response({'detail': 'token is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from notifications.models import Device
+        device, _ = Device.objects.get_or_create(user=request.user, token=token)
+        device.platform = platform
+        device.save(update_fields=['platform'])
+
+        return Response({'detail': 'token saved'}, status=status.HTTP_200_OK)
+
+
+class TrustScoreView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from ratings.utils import calculate_trust_score
+        data = calculate_trust_score(request.user)
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class ProfileView(APIView):
