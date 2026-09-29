@@ -1,5 +1,4 @@
 // lib/features/map/presentation/screens/map_screen.dart
-// ✅ 100% GRATUIT — OpenStreetMap via flutter_map (aucune clé API requise)
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -165,7 +164,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
               onTap: (_, __) => setState(() => _selectedTaxi = null),
             ),
             children: [
-              // Tuiles OpenStreetMap (100% gratuit)
+              // Tuiles OpenStreetMap
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.safetaxi.cameroun',
